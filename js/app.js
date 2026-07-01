@@ -43,48 +43,76 @@ function fitCanvas(canvas, cssSize) {
   return { ctx, size: w };
 }
 
-/* ---------- Main target ---------- */
-function drawTarget(canvas, historic, current, colors) {
+/* ---------- Main target ----------
+   `view` (optional) enlarges the target while aiming:
+   { tcx, tcy, RR }  → target centre/radius in px (zoomed & panned)
+   { aim, aimX, aimY, color, label } → precision crosshair + pending preview */
+function drawTarget(canvas, historic, current, colors, view) {
   const { ctx, size } = fitCanvas(canvas);
   const W = size, H = size, cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 4;
   ctx.clearRect(0, 0, W, H);
 
+  const tcx = view ? view.tcx : cx;
+  const tcy = view ? view.tcy : cy;
+  const RR  = view ? view.RR  : R;
+  const xR = RR * 0.05;
+
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.clip();
+  ctx.fillStyle = ZONES[0].fill; ctx.fillRect(0, 0, W, H);
+
   for (let i = 0; i < 10; i++) {
-    const outerR = R * (10 - i) / 10;
-    ctx.beginPath(); ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+    const outerR = RR * (10 - i) / 10;
+    ctx.beginPath(); ctx.arc(tcx, tcy, outerR, 0, Math.PI * 2);
     ctx.fillStyle = ZONES[i].fill; ctx.fill();
     ctx.strokeStyle = ZONES[i].stroke; ctx.lineWidth = i % 2 === 0 ? 0.5 : 1.1; ctx.stroke();
   }
 
   // X ring
-  const xR = R * 0.05;
-  ctx.beginPath(); ctx.arc(cx, cy, xR, 0, Math.PI * 2);
+  ctx.beginPath(); ctx.arc(tcx, tcy, xR, 0, Math.PI * 2);
   ctx.strokeStyle = 'rgba(80,60,0,0.5)'; ctx.lineWidth = 1; ctx.stroke();
 
-  // crosshair
-  ctx.save();
-  ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 0.6; ctx.setLineDash([4, 5]);
-  ctx.beginPath();
-  ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy);
-  ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R);
-  ctx.stroke(); ctx.restore();
+  if (!view) {
+    // crosshair
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 0.6; ctx.setLineDash([4, 5]);
+    ctx.beginPath();
+    ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy);
+    ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R);
+    ctx.stroke(); ctx.restore();
 
-  // zone numbers
-  ctx.save();
-  const fs = Math.max(9, Math.round(R * 0.062));
-  ctx.font = `600 ${fs}px Inter, sans-serif`;
-  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-  for (let z = 1; z <= 10; z++) {
-    const mid = R * (1 - (z - 0.5) / 10);
-    ctx.fillStyle = ZONE_TEXT[z - 1]; ctx.globalAlpha = 0.75;
-    ctx.fillText(z === 10 ? '10' : String(z), cx + mid + (z === 10 ? 3 : 4), cy);
+    // zone numbers
+    ctx.save();
+    const fs = Math.max(9, Math.round(R * 0.062));
+    ctx.font = `600 ${fs}px Inter, sans-serif`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    for (let z = 1; z <= 10; z++) {
+      const mid = R * (1 - (z - 0.5) / 10);
+      ctx.fillStyle = ZONE_TEXT[z - 1]; ctx.globalAlpha = 0.75;
+      ctx.fillText(z === 10 ? '10' : String(z), cx + mid + (z === 10 ? 3 : 4), cy);
+    }
+    ctx.globalAlpha = 0.6; ctx.font = `700 ${fs - 1}px Inter, sans-serif`; ctx.textAlign = 'center';
+    ctx.fillStyle = ZONE_TEXT[9]; ctx.fillText('X', cx, cy - xR - fs * 0.7);
+    ctx.restore();
   }
-  ctx.globalAlpha = 0.6; ctx.font = `700 ${fs - 1}px Inter, sans-serif`; ctx.textAlign = 'center';
-  ctx.fillStyle = ZONE_TEXT[9]; ctx.fillText('X', cx, cy - xR - fs * 0.7);
+
+  for (const s of historic) _dot(ctx, tcx + s.nx * RR, tcy + s.ny * RR, s.arrowId, colors[s.arrowId] || '#888', 0.26, RR);
+  for (const s of current)  _dot(ctx, tcx + s.nx * RR, tcy + s.ny * RR, s.arrowId, colors[s.arrowId] || '#222', 1, RR);
   ctx.restore();
 
-  for (const s of historic) _dot(ctx, cx + s.nx * R, cy + s.ny * R, s.arrowId, colors[s.arrowId] || '#888', 0.26, R);
-  for (const s of current)  _dot(ctx, cx + s.nx * R, cy + s.ny * R, s.arrowId, colors[s.arrowId] || '#222', 1, R);
+  // precision crosshair + pending arrow preview (zoom/aim mode)
+  if (view && view.aim) {
+    _dot(ctx, view.aimX, view.aimY, view.label, view.color, 0.92, R);
+    const cs = Math.max(15, R * 0.16);
+    ctx.save();
+    ctx.strokeStyle = '#ff8c00'; ctx.lineWidth = 2.4; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(view.aimX - cs, view.aimY); ctx.lineTo(view.aimX - cs * 0.34, view.aimY);
+    ctx.moveTo(view.aimX + cs * 0.34, view.aimY); ctx.lineTo(view.aimX + cs, view.aimY);
+    ctx.moveTo(view.aimX, view.aimY - cs); ctx.lineTo(view.aimX, view.aimY - cs * 0.34);
+    ctx.moveTo(view.aimX, view.aimY + cs * 0.34); ctx.lineTo(view.aimX, view.aimY + cs);
+    ctx.stroke(); ctx.restore();
+  }
 }
 
 function _dot(ctx, x, y, label, color, alpha, R) {
@@ -161,57 +189,6 @@ function _miniRings(ctx, tcx, tcy, scale) {
     ctx.strokeStyle = i % 2 === 0 ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.2)';
     ctx.lineWidth = i % 2 === 0 ? 0.3 : 0.8; ctx.stroke();
   }
-}
-
-/* ---------- Magnifier loupe (zoomed aim view) ---------- */
-function drawMagnifier(canvas, nx0, ny0, historic, current, colors, pendingLabel, pendingColor) {
-  // Size from layout width (transform-independent — reliable on mobile)
-  const cssW = canvas.offsetWidth || 150;
-  const dpr = Math.min(window.devicePixelRatio || 1, 3);
-  canvas.width = Math.round(cssW * dpr);
-  canvas.height = Math.round(cssW * dpr);
-  const ctx = canvas.getContext('2d');
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const M = cssW, mcx = M / 2, mcy = M / 2;
-  const view = 0.17;                 // half-window in normalized units (smaller = more zoom)
-  const Rz = (M / 2) / view;         // pixels per normalized unit inside the loupe
-  const tcx = mcx - nx0 * Rz, tcy = mcy - ny0 * Rz;
-  ctx.clearRect(0, 0, M, M);
-
-  ctx.save();
-  ctx.beginPath(); ctx.arc(mcx, mcy, M / 2, 0, Math.PI * 2); ctx.clip();
-  ctx.fillStyle = '#1b1b1b'; ctx.fillRect(0, 0, M, M);
-
-  for (let i = 0; i < 10; i++) {
-    const r = Rz * (10 - i) / 10;
-    ctx.beginPath(); ctx.arc(tcx, tcy, r, 0, Math.PI * 2);
-    ctx.fillStyle = ZONES[i].fill; ctx.fill();
-    ctx.strokeStyle = ZONES[i].stroke; ctx.lineWidth = i % 2 === 0 ? 0.6 : 1.4; ctx.stroke();
-  }
-  // X ring
-  ctx.beginPath(); ctx.arc(tcx, tcy, Rz * 0.05, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(80,60,0,0.5)'; ctx.lineWidth = 1; ctx.stroke();
-
-  for (const s of historic) _dot(ctx, tcx + s.nx * Rz, tcy + s.ny * Rz, s.arrowId, colors[s.arrowId] || '#888', 0.28, Rz);
-  for (const s of current)  _dot(ctx, tcx + s.nx * Rz, tcy + s.ny * Rz, s.arrowId, colors[s.arrowId] || '#222', 1, Rz);
-  ctx.restore();
-
-  // pending shot preview + crosshair at the exact landing point (loupe centre)
-  _dot(ctx, mcx, mcy, pendingLabel, pendingColor, 0.9, Rz);
-  const cs = M * 0.16;
-  ctx.save();
-  ctx.strokeStyle = '#ff8c00'; ctx.lineWidth = 2; ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(mcx - cs, mcy); ctx.lineTo(mcx - cs * 0.32, mcy);
-  ctx.moveTo(mcx + cs * 0.32, mcy); ctx.lineTo(mcx + cs, mcy);
-  ctx.moveTo(mcx, mcy - cs); ctx.lineTo(mcx, mcy - cs * 0.32);
-  ctx.moveTo(mcx, mcy + cs * 0.32); ctx.lineTo(mcx, mcy + cs);
-  ctx.stroke();
-  ctx.restore();
-
-  // loupe rim
-  ctx.beginPath(); ctx.arc(mcx, mcy, M / 2 - 1, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
 }
 
 /* ---------- Scoring ---------- */
@@ -528,32 +505,44 @@ const App = {
     if (!this._aiming) return;
     e.preventDefault();
     this._aiming = false;
-    this._hideMagnifier();
-    const { nx, ny } = canvasCoords(document.getElementById('target-canvas'), e);
+    const { nx, ny } = this._aimAt(e);
+    this._target();                 // redraw at normal zoom
     this._placeShot(nx, ny);
   },
 
-  _endAim() { this._aiming = false; this._hideMagnifier(); },
+  _endAim() { this._aiming = false; this._target(); },
 
-  _hideMagnifier() {
-    document.getElementById('magnifier').classList.remove('show');
+  // Geometry of the zoomed aim view (all in CSS px, matching drawTarget)
+  _aimGeom(e) {
+    const canvas = document.getElementById('target-canvas');
+    const rect = canvas.getBoundingClientRect();
+    const px = e.clientX - rect.left, py = e.clientY - rect.top;   // finger, CSS px
+    const cx = rect.width / 2, cy = rect.height / 2;
+    const R = Math.min(rect.width, rect.height) / 2 - 4;
+    const Z = 2.7;                                                 // zoom factor
+    const RR = R * Z;
+    // anchor the finger's target point under the finger, then zoom around it
+    const nfx = (px - cx) / R, nfy = (py - cy) / R;
+    const tcx = px - nfx * RR, tcy = py - nfy * RR;
+    // aim point sits above the finger so the finger never covers it
+    const dy = Math.min(52, R * 0.5);
+    const aimX = px, aimY = py - dy;
+    return { canvas, cx, cy, R, RR, tcx, tcy, aimX, aimY };
   },
 
-  // Live zoom loupe, pinned to the top corner opposite the finger while aiming
-  _updateAim(e) {
-    const canvas = document.getElementById('target-canvas');
-    const { nx, ny } = canvasCoords(canvas, e);
-    const mag = document.getElementById('magnifier');
-    drawMagnifier(mag, nx, ny,
-      this.session.volleys.flatMap(v => v.shots), this.currentShots,
-      this.colors, this.activeArrow, this.colors[this.activeArrow] || '#222');
+  _aimAt(e) {
+    const g = this._aimGeom(e);
+    return { nx: (g.aimX - g.tcx) / g.RR, ny: (g.aimY - g.tcy) / g.RR };
+  },
 
-    const wr = canvas.getBoundingClientRect();
-    const fingerOnLeft = (e.clientX - wr.left) < wr.width / 2;
-    mag.classList.toggle('at-right', fingerOnLeft);   // finger left → loupe on the right
-    mag.classList.toggle('at-left', !fingerOnLeft);
-    mag.classList.add('show');
-    this._hint(`Freccia ${this.activeArrow} · rilascia per confermare`);
+  // Enlarge the whole target under the finger while aiming
+  _updateAim(e) {
+    const g = this._aimGeom(e);
+    drawTarget(g.canvas,
+      this.session.volleys.flatMap(v => v.shots), this.currentShots, this.colors,
+      { tcx: g.tcx, tcy: g.tcy, RR: g.RR, aim: true, aimX: g.aimX, aimY: g.aimY,
+        color: this.colors[this.activeArrow] || '#222', label: this.activeArrow });
+    this._hint(`Freccia ${this.activeArrow} · muovi e rilascia per confermare`);
   },
 
   _placeShot(nx, ny) {
