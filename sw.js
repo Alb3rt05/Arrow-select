@@ -1,5 +1,5 @@
 /* ArrowSelect service worker — offline-first for the app shell */
-const CACHE = 'arrowselect-v1';
+const CACHE = 'arrowselect-v2';
 const ASSETS = [
   './',
   './index.html',

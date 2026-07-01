@@ -163,6 +163,51 @@ function _miniRings(ctx, tcx, tcy, scale) {
   }
 }
 
+/* ---------- Magnifier loupe (zoomed aim view) ---------- */
+function drawMagnifier(canvas, nx0, ny0, historic, current, colors, pendingLabel, pendingColor) {
+  const { ctx, size } = fitCanvas(canvas);
+  const M = size, mcx = M / 2, mcy = M / 2;
+  const view = 0.17;                 // half-window in normalized units (smaller = more zoom)
+  const Rz = (M / 2) / view;         // pixels per normalized unit inside the loupe
+  const tcx = mcx - nx0 * Rz, tcy = mcy - ny0 * Rz;
+  ctx.clearRect(0, 0, M, M);
+
+  ctx.save();
+  ctx.beginPath(); ctx.arc(mcx, mcy, M / 2, 0, Math.PI * 2); ctx.clip();
+  ctx.fillStyle = '#1b1b1b'; ctx.fillRect(0, 0, M, M);
+
+  for (let i = 0; i < 10; i++) {
+    const r = Rz * (10 - i) / 10;
+    ctx.beginPath(); ctx.arc(tcx, tcy, r, 0, Math.PI * 2);
+    ctx.fillStyle = ZONES[i].fill; ctx.fill();
+    ctx.strokeStyle = ZONES[i].stroke; ctx.lineWidth = i % 2 === 0 ? 0.6 : 1.4; ctx.stroke();
+  }
+  // X ring
+  ctx.beginPath(); ctx.arc(tcx, tcy, Rz * 0.05, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(80,60,0,0.5)'; ctx.lineWidth = 1; ctx.stroke();
+
+  for (const s of historic) _dot(ctx, tcx + s.nx * Rz, tcy + s.ny * Rz, s.arrowId, colors[s.arrowId] || '#888', 0.28, Rz);
+  for (const s of current)  _dot(ctx, tcx + s.nx * Rz, tcy + s.ny * Rz, s.arrowId, colors[s.arrowId] || '#222', 1, Rz);
+  ctx.restore();
+
+  // pending shot preview + crosshair at the exact landing point (loupe centre)
+  _dot(ctx, mcx, mcy, pendingLabel, pendingColor, 0.9, Rz);
+  const cs = M * 0.16;
+  ctx.save();
+  ctx.strokeStyle = '#ff8c00'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(mcx - cs, mcy); ctx.lineTo(mcx - cs * 0.32, mcy);
+  ctx.moveTo(mcx + cs * 0.32, mcy); ctx.lineTo(mcx + cs, mcy);
+  ctx.moveTo(mcx, mcy - cs); ctx.lineTo(mcx, mcy - cs * 0.32);
+  ctx.moveTo(mcx, mcy + cs * 0.32); ctx.lineTo(mcx, mcy + cs);
+  ctx.stroke();
+  ctx.restore();
+
+  // loupe rim
+  ctx.beginPath(); ctx.arc(mcx, mcy, M / 2 - 1, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+}
+
 /* ---------- Scoring ---------- */
 function getScore(nx, ny) { const d = Math.hypot(nx, ny); return d > 1 ? 0 : Math.max(1, Math.ceil(10 - d * 10)); }
 function isX(nx, ny) { return Math.hypot(nx, ny) < 0.05; }
@@ -280,8 +325,10 @@ const App = {
 
   init() {
     const c = document.getElementById('target-canvas');
-    c.addEventListener('click', e => this.onTargetClick(e));
-    c.addEventListener('touchend', e => { e.preventDefault(); this.onTargetClick(e); }, { passive: false });
+    c.addEventListener('pointerdown', e => this.onPointerDown(e));
+    c.addEventListener('pointermove', e => this.onPointerMove(e));
+    c.addEventListener('pointerup', e => this.onPointerUp(e));
+    c.addEventListener('pointercancel', () => this._endAim());
     document.getElementById('s-count').addEventListener('input', () => this._autoArrows());
     document.getElementById('theme-toggle').addEventListener('click', () => UI.toggleTheme());
     window.addEventListener('resize', this._debounce(() => {
@@ -453,14 +500,64 @@ const App = {
     else { h.textContent = 'Seleziona una freccia, poi tocca il bersaglio'; h.style.opacity = '.7'; }
   },
 
-  onTargetClick(e) {
+  onPointerDown(e) {
     if (!this.activeArrow) {
       this._hint('Prima seleziona una freccia ☝');
       UI.toast('Seleziona prima una freccia', 'info', 1600);
       return;
     }
+    e.preventDefault();
+    this._aiming = true;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+    this._updateAim(e);
+  },
+
+  onPointerMove(e) {
+    if (!this._aiming) return;
+    e.preventDefault();
+    this._updateAim(e);
+  },
+
+  onPointerUp(e) {
+    if (!this._aiming) return;
+    e.preventDefault();
+    this._aiming = false;
+    this._hideMagnifier();
+    const { nx, ny } = canvasCoords(document.getElementById('target-canvas'), e);
+    this._placeShot(nx, ny);
+  },
+
+  _endAim() { this._aiming = false; this._hideMagnifier(); },
+
+  _hideMagnifier() {
+    document.getElementById('magnifier').classList.remove('show');
+  },
+
+  // Live zoom loupe that follows the finger/cursor while aiming
+  _updateAim(e) {
     const canvas = document.getElementById('target-canvas');
     const { nx, ny } = canvasCoords(canvas, e);
+    const mag = document.getElementById('magnifier');
+    drawMagnifier(mag, nx, ny,
+      this.session.volleys.flatMap(v => v.shots), this.currentShots,
+      this.colors, this.activeArrow, this.colors[this.activeArrow] || '#222');
+
+    // position the loupe above the touch point so the finger never covers it
+    const wrap = canvas.closest('.target-wrapper');
+    const wr = wrap.getBoundingClientRect();
+    const half = mag.offsetWidth / 2 || 65;
+    let lx = e.clientX - wr.left;
+    let ly = e.clientY - wr.top - (half + 46);       // lift above the finger
+    if (ly - half < 4) ly = e.clientY - wr.top + (half + 46); // flip below near the top edge
+    lx = Math.max(half + 4, Math.min(wr.width - half - 4, lx));
+    ly = Math.max(half + 4, Math.min(wr.height - half - 4, ly));
+    mag.style.left = lx + 'px';
+    mag.style.top = ly + 'px';
+    mag.classList.add('show');
+    this._hint(`Freccia ${this.activeArrow} · rilascia per confermare`);
+  },
+
+  _placeShot(nx, ny) {
     if (Math.hypot(nx, ny) > 1.15) { this._hint('Tocca dentro il bersaglio'); return; }
     const arrow = this.activeArrow;
     this.currentShots = this.currentShots.filter(s => s.arrowId !== arrow);

@@ -467,6 +467,22 @@ select {
   border-radius: 50%;
   filter: drop-shadow(0 8px 24px rgba(0,0,0,.5));
 }
+/* Magnifier loupe — zooms the target while aiming for precise placement */
+.magnifier {
+  position: absolute; left: 0; top: 0;
+  width: 130px; height: 130px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,.92);
+  box-shadow: 0 8px 26px rgba(0,0,0,.55), inset 0 0 0 1px rgba(0,0,0,.25);
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(.6);
+  transform-origin: center;
+  opacity: 0; visibility: hidden;
+  transition: opacity .12s var(--ease), transform .12s var(--ease);
+  z-index: 20;
+}
+.magnifier.show { opacity: 1; visibility: visible; transform: translate(-50%, -50%) scale(1); }
+@media (min-width: 640px) { .magnifier { width: 150px; height: 150px; } }
 .target-hint {
   position: absolute; bottom: 0.9rem; left: 50%; transform: translateX(-50%);
   font-size: 0.72rem; color: rgba(255,255,255,.55);
