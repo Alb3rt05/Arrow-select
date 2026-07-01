@@ -1,0 +1,20 @@
+{
+  "name": "ArrowSelect – Selezione Frecce",
+  "short_name": "ArrowSelect",
+  "description": "Registra le tue volate di tiro con l'arco e scopri quale freccia raggruppa più stretta. Funziona offline.",
+  "lang": "it",
+  "dir": "ltr",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0d2b1e",
+  "theme_color": "#0d2b1e",
+  "categories": ["sports", "utilities"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-192-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
