@@ -165,8 +165,14 @@ function _miniRings(ctx, tcx, tcy, scale) {
 
 /* ---------- Magnifier loupe (zoomed aim view) ---------- */
 function drawMagnifier(canvas, nx0, ny0, historic, current, colors, pendingLabel, pendingColor) {
-  const { ctx, size } = fitCanvas(canvas);
-  const M = size, mcx = M / 2, mcy = M / 2;
+  // Size from layout width (transform-independent — reliable on mobile)
+  const cssW = canvas.offsetWidth || 150;
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssW * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const M = cssW, mcx = M / 2, mcy = M / 2;
   const view = 0.17;                 // half-window in normalized units (smaller = more zoom)
   const Rz = (M / 2) / view;         // pixels per normalized unit inside the loupe
   const tcx = mcx - nx0 * Rz, tcy = mcy - ny0 * Rz;
@@ -533,7 +539,7 @@ const App = {
     document.getElementById('magnifier').classList.remove('show');
   },
 
-  // Live zoom loupe that follows the finger/cursor while aiming
+  // Live zoom loupe, pinned to the top corner opposite the finger while aiming
   _updateAim(e) {
     const canvas = document.getElementById('target-canvas');
     const { nx, ny } = canvasCoords(canvas, e);
@@ -542,17 +548,10 @@ const App = {
       this.session.volleys.flatMap(v => v.shots), this.currentShots,
       this.colors, this.activeArrow, this.colors[this.activeArrow] || '#222');
 
-    // position the loupe above the touch point so the finger never covers it
-    const wrap = canvas.closest('.target-wrapper');
-    const wr = wrap.getBoundingClientRect();
-    const half = mag.offsetWidth / 2 || 65;
-    let lx = e.clientX - wr.left;
-    let ly = e.clientY - wr.top - (half + 46);       // lift above the finger
-    if (ly - half < 4) ly = e.clientY - wr.top + (half + 46); // flip below near the top edge
-    lx = Math.max(half + 4, Math.min(wr.width - half - 4, lx));
-    ly = Math.max(half + 4, Math.min(wr.height - half - 4, ly));
-    mag.style.left = lx + 'px';
-    mag.style.top = ly + 'px';
+    const wr = canvas.getBoundingClientRect();
+    const fingerOnLeft = (e.clientX - wr.left) < wr.width / 2;
+    mag.classList.toggle('at-right', fingerOnLeft);   // finger left → loupe on the right
+    mag.classList.toggle('at-left', !fingerOnLeft);
     mag.classList.add('show');
     this._hint(`Freccia ${this.activeArrow} · rilascia per confermare`);
   },
