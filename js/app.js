@@ -307,11 +307,17 @@ const App = {
   session: null, currentShots: [], activeArrow: null, colors: {}, targetType: '122',
 
   init() {
+    console.log('%cArrowSelect build: zoom-touch v6', 'color:#fb923c;font-weight:bold');
     const c = document.getElementById('target-canvas');
-    c.addEventListener('pointerdown', e => this.onPointerDown(e));
-    c.addEventListener('pointermove', e => this.onPointerMove(e));
-    c.addEventListener('pointerup', e => this.onPointerUp(e));
-    c.addEventListener('pointercancel', () => this._endAim());
+    // Touch (mobile) — universal support, no reliance on Pointer Events
+    c.addEventListener('touchstart', e => this.onAimStart(e), { passive: false });
+    c.addEventListener('touchmove',  e => this.onAimMove(e),  { passive: false });
+    c.addEventListener('touchend',   e => this.onAimEnd(e),   { passive: false });
+    c.addEventListener('touchcancel', () => this._endAim(), { passive: false });
+    // Mouse (desktop)
+    c.addEventListener('mousedown', e => this.onAimStart(e));
+    c.addEventListener('mousemove', e => this.onAimMove(e));
+    c.addEventListener('mouseup',   e => this.onAimEnd(e));
     document.getElementById('s-count').addEventListener('input', () => this._autoArrows());
     document.getElementById('theme-toggle').addEventListener('click', () => UI.toggleTheme());
     window.addEventListener('resize', this._debounce(() => {
@@ -326,6 +332,11 @@ const App = {
   _registerSW() {
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
       window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+      // When a new service worker takes control, reload once to pick up fresh code
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (reloaded) return; reloaded = true; location.reload();
+      });
     }
   },
 
@@ -483,40 +494,51 @@ const App = {
     else { h.textContent = 'Seleziona una freccia, poi tocca il bersaglio'; h.style.opacity = '.7'; }
   },
 
-  onPointerDown(e) {
+  // Extract client x/y from a touch or mouse event
+  _pt(e) {
+    const t = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]);
+    return t ? { x: t.clientX, y: t.clientY } : { x: e.clientX, y: e.clientY };
+  },
+
+  onAimStart(e) {
+    // ignore synthetic mouse events that follow a touch
+    if (e.type === 'mousedown' && this._touchActive) return;
+    if (e.type.startsWith('touch')) this._touchActive = true;
     if (!this.activeArrow) {
       this._hint('Prima seleziona una freccia ☝');
       UI.toast('Seleziona prima una freccia', 'info', 1600);
       return;
     }
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
     this._aiming = true;
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
     this._updateAim(e);
   },
 
-  onPointerMove(e) {
+  onAimMove(e) {
     if (!this._aiming) return;
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
     this._updateAim(e);
   },
 
-  onPointerUp(e) {
-    if (!this._aiming) return;
-    e.preventDefault();
+  onAimEnd(e) {
+    if (e.type === 'mouseup' && this._touchActive) { this._touchActive = false; return; }
+    if (!this._aiming) { this._touchActive = false; return; }
+    if (e.cancelable) e.preventDefault();
     this._aiming = false;
+    this._touchActive = false;
     const { nx, ny } = this._aimAt(e);
     this._target();                 // redraw at normal zoom
     this._placeShot(nx, ny);
   },
 
-  _endAim() { this._aiming = false; this._target(); },
+  _endAim() { this._aiming = false; this._touchActive = false; this._target(); },
 
   // Geometry of the zoomed aim view (all in CSS px, matching drawTarget)
   _aimGeom(e) {
     const canvas = document.getElementById('target-canvas');
     const rect = canvas.getBoundingClientRect();
-    const px = e.clientX - rect.left, py = e.clientY - rect.top;   // finger, CSS px
+    const p = this._pt(e);
+    const px = p.x - rect.left, py = p.y - rect.top;              // finger, CSS px
     const cx = rect.width / 2, cy = rect.height / 2;
     const R = Math.min(rect.width, rect.height) / 2 - 4;
     const Z = 2.7;                                                 // zoom factor

@@ -1,5 +1,5 @@
 /* ArrowSelect service worker — offline-first for the app shell */
-const CACHE = 'arrowselect-v4';
+const CACHE = 'arrowselect-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -29,7 +29,7 @@ self.addEventListener('fetch', e => {
   const url = new URL(req.url);
   if (url.origin !== location.origin) return; // let cross-origin (fonts) hit network
 
-  // Network-first for the HTML document, cache-first for static assets
+  // Network-first for the HTML document
   if (req.mode === 'navigate') {
     e.respondWith(
       fetch(req).then(res => {
@@ -37,6 +37,20 @@ self.addEventListener('fetch', e => {
         caches.open(CACHE).then(c => c.put('./index.html', copy));
         return res;
       }).catch(() => caches.match('./index.html'))
+    );
+    return;
+  }
+
+  // Network-first for our own code (JS/CSS) so updates are never masked by cache;
+  // cache-first for other static assets (icons, fonts, manifest)
+  const isCode = /\.(?:js|css)(?:\?|$)/.test(url.pathname);
+  if (isCode) {
+    e.respondWith(
+      fetch(req).then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(req, copy));
+        return res;
+      }).catch(() => caches.match(req))
     );
     return;
   }
