@@ -2,7 +2,7 @@
 
 # 🎯 ArrowSelect
 
-**Registra le tue volate di tiro con l'arco e scopri quale freccia raggruppa più stretta.**
+**Registra le tue voleè di tiro con l'arco e scopri quale freccia raggruppa più stretta.**
 
 App web statica, **installabile** e **offline-first** (PWA). Zero backend, zero build step.
 

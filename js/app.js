@@ -26,6 +26,9 @@ const ZONES = [
   { fill: '#ffe033', stroke: '#c09000' }, // 10 / X
 ];
 const ZONE_TEXT = ['#555','#555','#ccc','#ccc','#c8d8ff','#c8d8ff','#ffc8c8','#ffc8c8','#5a3800','#5a3800'];
+/* High-contrast colours for the zone numbers + an opposite halo for legibility on every ring */
+const ZONE_NUM  = ['#141414','#141414','#ffffff','#ffffff','#ffffff','#ffffff','#ffffff','#ffffff','#3a2400','#3a2400'];
+const ZONE_HALO = ['rgba(255,255,255,.92)','rgba(255,255,255,.92)','rgba(0,0,0,.6)','rgba(0,0,0,.6)','rgba(0,0,0,.5)','rgba(0,0,0,.5)','rgba(0,0,0,.5)','rgba(0,0,0,.5)','rgba(255,255,255,.92)','rgba(255,255,255,.92)'];
 
 /* Radius (cm) of each target for physical σ conversion */
 const TARGET_RADIUS_CM = { 122: 61, 80: 40, 40: 20 };
@@ -81,18 +84,36 @@ function drawTarget(canvas, historic, current, colors, view) {
     ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R);
     ctx.stroke(); ctx.restore();
 
-    // zone numbers
+    // zone numbers along the horizontal axis — bold, high-contrast, haloed
     ctx.save();
-    const fs = Math.max(9, Math.round(R * 0.062));
-    ctx.font = `600 ${fs}px Inter, sans-serif`;
+    const fs = Math.max(10, Math.round(R * 0.062));
+    ctx.font = `800 ${fs}px Inter, sans-serif`;
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    for (let z = 1; z <= 10; z++) {
-      const mid = R * (1 - (z - 0.5) / 10);
-      ctx.fillStyle = ZONE_TEXT[z - 1]; ctx.globalAlpha = 0.75;
-      ctx.fillText(z === 10 ? '10' : String(z), cx + mid + (z === 10 ? 3 : 4), cy);
+    ctx.lineJoin = 'round'; ctx.miterLimit = 2;
+    ctx.lineWidth = Math.max(2.5, fs * 0.22);
+    // 10 → 1 laid out along the +x axis with even gaps (measured, so "10" never crowds "9")
+    const widths = [];
+    for (let z = 10; z >= 1; z--) widths.push(ctx.measureText(String(z)).width);
+    const span = R * 0.86, totalW = widths.reduce((a, b) => a + b, 0);
+    const gap = Math.max(fs * 0.38, (span - totalW) / 9);
+    let x = cx + R * 0.12;
+    for (let k = 0; k < 10; k++) {
+      const z = 10 - k, txt = String(z);
+      ctx.strokeStyle = ZONE_HALO[z - 1]; ctx.strokeText(txt, x, cy);
+      ctx.fillStyle = ZONE_NUM[z - 1];   ctx.fillText(txt, x, cy);
+      x += widths[k] + gap;
     }
-    ctx.globalAlpha = 0.6; ctx.font = `700 ${fs - 1}px Inter, sans-serif`; ctx.textAlign = 'center';
-    ctx.fillStyle = ZONE_TEXT[9]; ctx.fillText('X', cx, cy - xR - fs * 0.7);
+    ctx.restore();
+
+    // X — centred on the bullseye, bold and clearly visible
+    ctx.save();
+    const xfs = Math.max(13, Math.round(R * 0.08));
+    ctx.font = `800 ${xfs}px Inter, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.max(3, xfs * 0.24);
+    ctx.strokeStyle = 'rgba(255,255,255,.92)'; ctx.strokeText('X', cx, cy);
+    ctx.fillStyle = '#3a2400'; ctx.fillText('X', cx, cy);
     ctx.restore();
   }
 
@@ -307,7 +328,7 @@ const App = {
   session: null, currentShots: [], activeArrow: null, colors: {}, targetType: '122',
 
   init() {
-    console.log('%cArrowSelect build: zoom-touch v7', 'color:#fb923c;font-weight:bold');
+    console.log('%cArrowSelect build: zoom-touch v8', 'color:#fb923c;font-weight:bold');
     const c = document.getElementById('target-canvas');
     // Touch (mobile) — universal support, no reliance on Pointer Events
     c.addEventListener('touchstart', e => this.onAimStart(e), { passive: false });
@@ -394,7 +415,7 @@ const App = {
               <span class="meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>${fmt(s.createdAt)}</span>
               <span class="meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m2 22 1-1M15 5l4 4M13 3l8 8"/></svg>${s.arrowNumbers.length} frecce</span>
               <span class="meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>${s.targetType} cm</span>
-              <span class="meta">${s.volleys.length} volate</span>
+              <span class="meta">${s.volleys.length} voleè</span>
             </div>
           </div>
           <button class="del-btn" onclick="App.delSession('${s.id}')" aria-label="Elimina sessione">${ICON.trash}</button>
@@ -408,7 +429,7 @@ const App = {
     const s = DB.load().find(x => x.id === id);
     const ok = await UI.confirm({
       title: 'Eliminare la sessione?',
-      message: `«${this._esc(s && s.name) || 'Sessione senza nome'}» e tutte le sue volate verranno rimosse. L'azione non è reversibile.`,
+      message: `«${this._esc(s && s.name) || 'Sessione senza nome'}» e tutte le sue voleè verranno rimosse. L'azione non è reversibile.`,
       confirmText: 'Elimina'
     });
     if (ok) { DB.del(id); this.renderHome(); UI.toast('Sessione eliminata', 'info'); }

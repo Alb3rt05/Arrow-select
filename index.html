@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="description" content="ArrowSelect — registra le tue volate di tiro con l'arco e scopri quale freccia raggruppa più stretta. Funziona offline.">
+  <meta name="description" content="ArrowSelect — registra le tue voleè di tiro con l'arco e scopri quale freccia raggruppa più stretta. Funziona offline.">
   <meta name="theme-color" content="#0d2b1e" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0a1410" media="(prefers-color-scheme: dark)">
   <meta name="color-scheme" content="light dark">
@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
-  <link rel="stylesheet" href="css/styles.css?v=7">
+  <link rel="stylesheet" href="css/styles.css?v=8">
 
   <!-- Set theme before paint to avoid flash -->
   <script>
@@ -59,7 +59,7 @@
         Tiro con l'arco
       </span>
       <h2>Trova la tua freccia migliore</h2>
-      <p>Registra le volate, tocca il bersaglio e scopri quale freccia raggruppa più stretta.</p>
+      <p>Registra le voleè, tocca il bersaglio e scopri quale freccia raggruppa più stretta.</p>
       <button class="btn btn-lg" onclick="App.goSetup()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
         Nuova sessione
@@ -163,14 +163,14 @@
         </button>
       </div>
       <div class="stats-row">
-        <div class="stat"><div class="stat-val" id="st-volleys">0</div><div class="stat-lbl">Volate</div></div>
+        <div class="stat"><div class="stat-val" id="st-volleys">0</div><div class="stat-lbl">voleè</div></div>
         <div class="stat"><div class="stat-val" id="st-shots">0</div><div class="stat-lbl">Tiri</div></div>
         <div class="stat"><div class="stat-val" id="st-avg">–</div><div class="stat-lbl">Media</div></div>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-head"><span class="card-title">Storico volate</span></div>
+      <div class="card-head"><span class="card-title">Storico voleè</span></div>
       <div id="volley-hist" class="hist-scroll"></div>
     </div>
   </div>
@@ -192,6 +192,6 @@
 <div class="toast-wrap" id="toast-wrap" aria-live="polite"></div>
 <div id="modal-root"></div>
 
-<script src="js/app.js?v=7"></script>
+<script src="js/app.js?v=8"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 {
   "name": "arrowselect",
   "version": "1.0.0",
-  "description": "Registra le tue volate di tiro con l'arco e scopri quale freccia raggruppa più stretta. App statica PWA, offline-first.",
+  "description": "Registra le tue voleè di tiro con l'arco e scopri quale freccia raggruppa più stretta. App statica PWA, offline-first.",
   "type": "module",
   "scripts": {
     "dev": "npx --yes serve -l 5173 .",
