@@ -307,7 +307,7 @@ const App = {
   session: null, currentShots: [], activeArrow: null, colors: {}, targetType: '122',
 
   init() {
-    console.log('%cArrowSelect build: zoom-touch v6', 'color:#fb923c;font-weight:bold');
+    console.log('%cArrowSelect build: zoom-touch v7', 'color:#fb923c;font-weight:bold');
     const c = document.getElementById('target-canvas');
     // Touch (mobile) — universal support, no reliance on Pointer Events
     c.addEventListener('touchstart', e => this.onAimStart(e), { passive: false });
